@@ -11,75 +11,64 @@
 ***********************************************************/
 #include <Nextion.h>
 
-enum operatingMode { DICE, STREAM, GEIGER, SETTINGS};
+enum operatingMode { DICE, STREAM, GEIGER, SETTINGS };
 enum lightMode { OFF, BLINK, WAVE };
 
-operatingMode op = STREAM;
+//global variables
+#define LOG_PERIOD 15000  //Logging period in milliseconds, recommended value 15000-60000.
+#define MAX_PERIOD 60000  //Maximum logging period without modifying this sketch
+unsigned long counts;     //variable for GM Tube events
+unsigned long cpm;        //variable for CPM
+unsigned int multiplier;  //variable for calculation CPM in this sketch
+unsigned long previousMillis;  //variable for time measurement
+
+operatingMode op = GEIGER;
 
 unsigned long minDiceRoll = 1; //this will be set in settings and stored in EEPROM
 unsigned long maxDiceRoll = 6; //this will be set in settings and stored in EEPROM
-unsigned int cpmLogPeriod = 5000;
-unsigned int cpmMaxPeriod = 60000;
 
-unsigned int geigerReadEventPeriod = 1;
-bool logEvent = false;
-byte lastRandom = 0;
-
+byte nextRandom = 0;
 short bitCounter = 0;
-unsigned long currentMillis = 0;
 
-/******CPM Stuff TODO */
-unsigned long startTime;
-unsigned long cpm;        //variable for CPM
-unsigned int multiplier;  //variable for calculation CPM in this sketch
-unsigned long previousMillis = 0;  //variable for time measurement
-unsigned long cpmDisp;
+// Nextion Screen
+// Declare a number object [page id:0, component id:2, component name: "randNumberDice"].
+NexNumber randNumberDice = NexNumber(0, 2, "randNumberDice");
+NexNumber randNumberDiceStream = NexNumber(1, 3, "streamNum");
+NexNumber countsPerMinute = NexNumber(2, 2, "CPM");
 
-bool bools[2];
-short count = 0;
-
-
-//Nextion Screen
-// Declare a number object [page id:0, component id:2, component name: "randNumber"].
-NexNumber randNumber = NexNumber(0, 2, "randNumber");
 // Declare a button object [page id:0, component id:1, component name: "generateButton"].
 NexButton generateButton = NexButton(0, 1, "generateButton");
-NexNumber randNumberStream = NexNumber(1, 3, "streamNum");
 
-
-/*
-   Register objects randNumber and generateButton to the touch event list.
-*/
+//Register objects randNumberDice and generateButton to the touch event list.
 NexTouch *nex_listen_list[] =
 {
-  &randNumber,
   &generateButton,
   NULL
 };
 
 void tube_impulse() {      //subprocedure for capturing events from Geiger Kit
-  //logEvent = true;
-  //Serial.println("pulse");
+  counts++; //used in CPM calculation
 
-  if(bitCounter < 8){
-    bitWrite(lastRandom, bitCounter, (micros() / 4) % 2);
+  //nextRandom bitCounter - how many bits are full
+  if (bitCounter < 8) {
+    bitWrite(nextRandom, bitCounter, (micros() / 4) % 2);
     bitCounter++;
   }
 }
 
-/*
-   Button component pop callback function. In this example,the value of the randNumber
-   component will become a random number between 1 and 100 when button is released.
-*/
- void generateButtonPopCallback(void *ptr) {
-  randNumber.setValue(lastRandom);
- }
-
+//Button component pop callback function. In this example,the value of the randNumberDice
+//component will become a random number between 1 and 100 when button is released.
+void generateButtonPopCallback(void *ptr) {
+  randNumberDice.setValue(nextRandom);
+}
 
 void setup() {
-  startTime = millis();
+  counts = 0;
+  cpm = 0;
+  multiplier = MAX_PERIOD / LOG_PERIOD;
+
   attachInterrupt(0, tube_impulse, FALLING); //define external interrupts
-  
+
   //Serial.begin(9600);
   nexInit();
 
@@ -88,10 +77,25 @@ void setup() {
 }
 
 void loop() {
+  //Nextion update
   nexLoop(nex_listen_list);
 
-  if(bitCounter > 7){
-    randNumberStream.setValue(lastRandom);
-    bitCounter = 0;
-  }
+  if(op == STREAM){
+    if (bitCounter > 7) {
+      randNumberDiceStream.setValue(nextRandom);
+      bitCounter = 0;
+    }
+  }else if(op == GEIGER){
+      unsigned long currentMillis = millis();
+      if(currentMillis - previousMillis > LOG_PERIOD){
+        previousMillis = currentMillis;
+        cpm = counts * multiplier;
+        countsPerMinute.setValue(cpm);
+        counts = 0;
+      }   
+  }else if(op == DICE){
+    if (bitCounter > 7) {
+      //notify a new number is available
+    }
+  }  
 }
