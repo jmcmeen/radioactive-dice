@@ -7,7 +7,7 @@
   Adam Lothridge - alothrid@stumail.northeaststate.edu
   Kevin McBrien - kmcbrien@stumail.northeaststate.edu
   John McMeen - jnmcmeen@northeaststate.edu
-  Date: 4/23/21
+  Date: 4/27/21
 ***********************************************************/
 #include <Nextion.h>
 
@@ -25,7 +25,7 @@ unsigned int geigerReadEventPeriod = 1;
 bool logEvent = false;
 byte lastRandom = 0;
 
-short lastRandomCounter = 0;
+short bitCounter = 0;
 unsigned long currentMillis = 0;
 
 /******CPM Stuff TODO */
@@ -50,26 +50,30 @@ NexNumber randNumberStream = NexNumber(1, 3, "streamNum");
 /*
    Register objects randNumber and generateButton to the touch event list.
 */
-  NexTouch *nex_listen_list[] =
-  {
+NexTouch *nex_listen_list[] =
+{
   &randNumber,
   &generateButton,
   NULL
-  };
+};
 
 void tube_impulse() {      //subprocedure for capturing events from Geiger Kit
-  logEvent = true;
+  //logEvent = true;
   //Serial.println("pulse");
-}
 
+  if(bitCounter < 8){
+    bitWrite(lastRandom, bitCounter, (micros() / 4) % 2);
+    bitCounter++;
+  }
+}
 
 /*
    Button component pop callback function. In this example,the value of the randNumber
    component will become a random number between 1 and 100 when button is released.
 */
-  void generateButtonPopCallback(void *ptr) {
+ void generateButtonPopCallback(void *ptr) {
   randNumber.setValue(lastRandom);
-  }
+ }
 
 
 void setup() {
@@ -83,40 +87,11 @@ void setup() {
   generateButton.attachPop(generateButtonPopCallback);
 }
 
-
 void loop() {
   nexLoop(nex_listen_list);
 
-  //Each millisecond
-  currentMillis = millis();
-  if (currentMillis - previousMillis > geigerReadEventPeriod) {
-    //Serial.println(currentMillis - previousMillis);
-    previousMillis = currentMillis;
-
-    //Von Neumann debias each pair of Geiger events
-    if(count != 2){
-      bools[count] = logEvent;
-      count++;
-      if(logEvent){
-        logEvent = false;
-      }
-    } else if(count == 2){
-      if(bools[0] != bools[1]){
-        bitWrite(lastRandom, lastRandomCounter, bools[0]);
-        
-        //Serial.print(bools[0]);
-        lastRandomCounter++;
-      }
-      count = 0;
-    }
-
-    if(lastRandomCounter == 8){
-      //Serial.println(lastRandom);
-      lastRandomCounter = 0;
-      if(op == STREAM){
-        randNumberStream.setValue(lastRandom);
-      }
-    } 
+  if(bitCounter > 7){
+    randNumberStream.setValue(lastRandom);
+    bitCounter = 0;
   }
-
 }
