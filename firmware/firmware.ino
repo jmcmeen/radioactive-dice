@@ -14,6 +14,8 @@
 enum operatingMode { DICE, STREAM, GEIGER, SETTINGS };
 enum lightMode { OFF, BLINK, WAVE };
 
+int uvLedPins[] = {3, 4, 5, 6, 7, 8, 9, 10, 11};
+
 //global variables
 #define LOG_PERIOD 15000  //Logging period in milliseconds, recommended value 15000-60000.
 #define MAX_PERIOD 60000  //Maximum logging period without modifying this sketch
@@ -22,13 +24,14 @@ unsigned long cpm;        //variable for CPM
 unsigned int multiplier;  //variable for calculation CPM in this sketch
 unsigned long previousMillis;  //variable for time measurement
 
-operatingMode op = GEIGER;
+//operatingMode op = GEIGER;
 
 unsigned long minDiceRoll = 1; //this will be set in settings and stored in EEPROM
 unsigned long maxDiceRoll = 6; //this will be set in settings and stored in EEPROM
 
 byte nextRandom = 0;
 short bitCounter = 0;
+int lightOnCounter = 10000;
 
 // Nextion Screen
 // Declare a number object [page id:0, component id:2, component name: "randNumberDice"].
@@ -74,12 +77,47 @@ void setup() {
 
   //Register the pop event callback function of the current generateButton component.
   generateButton.attachPop(generateButtonPopCallback);
+
+  for(byte i = 0; i < 9; i++){
+    pinMode(uvLedPins[i], OUTPUT);
+  }
+
+  pinMode(12, OUTPUT);
+  digitalWrite(12, HIGH);
+
+    for(byte i = 0; i < 9; i++){
+    digitalWrite(uvLedPins[i], HIGH);   // turn the LED on (HIGH is the voltage level)  
+  }
 }
 
 void loop() {
   //Nextion update
   nexLoop(nex_listen_list);
 
+  lightOnCounter--;
+
+  if (bitCounter > 7) {
+    randNumberDiceStream.setValue(nextRandom);
+    bitCounter = 0;
+  }
+
+  unsigned long currentMillis = millis();
+  if(currentMillis - previousMillis > LOG_PERIOD){
+    previousMillis = currentMillis;
+    cpm = counts * multiplier;
+    countsPerMinute.setValue(cpm);
+    counts = 0;
+  }   
+/*
+  if(lightOnCounter < 0){
+    for(byte i = 0; i < 9; i++){
+      digitalWrite(uvLedPins[i], LOW);   // turn the LED on (HIGH is the voltage level)  
+    }
+  }
+  */
+   
+  
+/*
   if(op == STREAM){
     if (bitCounter > 7) {
       randNumberDiceStream.setValue(nextRandom);
@@ -98,4 +136,5 @@ void loop() {
       //notify a new number is available
     }
   }  
+  */
 }
