@@ -1,2 +1,2 @@
-# radioactive_dice
-Repository for the 2021 NeSCC Programming Embedded Systems Project
+# Becquerel Random Number Generator
+Repository for the Spring 2021 NeSCC Programming Embedded Systems Project
